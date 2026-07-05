@@ -1,8 +1,8 @@
 import javax.sound.sampled.*;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
 public class BoomboxEngine {
 
     // cache to hold raw audio bytes in ram
-    private final Map<String, CachedSound> soundCache = new HashMap<>();
+    private final Map<String, CachedSound> soundCache = new ConcurrentHashMap<>();
     
     // background worker threads
     private final ExecutorService audioThreadPool = Executors.newCachedThreadPool();
@@ -47,7 +47,7 @@ public class BoomboxEngine {
 
     // play the sound
     public void play(String name) {
-        play(name, 1.0f); // defualt: full volume
+        play(name, 1.0f);
     }
 
     // play the sound with a custom volume
@@ -57,6 +57,9 @@ public class BoomboxEngine {
             System.err.println("[Boombox] Error: Sound '" + name + "' not found in cache!");
             return;
         }
+
+        // keep volume on a 0-1 scale so we never overshoot the control
+        final float vol = Math.max(0.0f, Math.min(1.0f, volume));
 
         // pass the playback to a background thread
         audioThreadPool.submit(() -> {
@@ -70,9 +73,18 @@ public class BoomboxEngine {
                 // set volume
                 if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                     FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-                    float range = gainControl.getMaximum() - gainControl.getMinimum();
-                    float gain = (range * volume) + gainControl.getMinimum();
-                    gainControl.setValue(gain);
+
+                    // gain is in decibels instead of a straight lerp
+                    float dB;
+                    if (vol <= 0.0f) {
+                        dB = gainControl.getMinimum(); // basically silent
+                    } else {
+                        dB = (float) (20.0 * Math.log10(vol));
+                    }
+
+                    // stay inside whatever range this control actually allows
+                    dB = Math.max(gainControl.getMinimum(), Math.min(gainControl.getMaximum(), dB));
+                    gainControl.setValue(dB);
                 }
 
                 // important: listen for when the sound stops and clear it from memory
@@ -89,7 +101,7 @@ public class BoomboxEngine {
         });
     }
 
-    // shut down the engine when the game closes
+    // shut down the engine
     public void shutdown() {
         audioThreadPool.shutdown();
         soundCache.clear();
