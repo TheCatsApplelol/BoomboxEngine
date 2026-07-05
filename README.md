@@ -24,7 +24,7 @@ name: A nickname for your sound (e.g., "laser").
 
 resourcePath: Where the file lives on the classpath (e.g., "/sounds/laser.wav").
 
-Heads up: paths are resolved relative to BoomboxEngine's package unless they start with a `/`. So a file sitting at the root of your jar is "/laser.wav", not "laser.wav". If you ever get a "Resource not found", a missing leading slash is almost always the culprit.
+> **Heads up:** paths are resolved relative to `BoomboxEngine`'s package unless they start with a `/`. So a file sitting at the root of your jar is `"/laser.wav"`, not `"laser.wav"`. If you ever get a "Resource not found", a missing leading slash is almost always the culprit.
 
 
 ```engine.play(String name)```
