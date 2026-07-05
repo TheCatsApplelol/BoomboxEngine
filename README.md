@@ -16,6 +16,17 @@ name: A nickname for your sound (e.g., "laser").
 
 filepath: Where the file is located (e.g., "assets/laser.wav").
 
+```engine.loadResource(String name, String resourcePath)```
+
+Same as load, but pulls the .wav straight off your classpath instead of the disk.
+
+name: A nickname for your sound (e.g., "laser").
+
+resourcePath: Where the file lives on the classpath (e.g., "/sounds/laser.wav").
+
+Heads up: paths are resolved relative to BoomboxEngine's package unless they start with a `/`. So a file sitting at the root of your jar is "/laser.wav", not "laser.wav". If you ever get a "Resource not found", a missing leading slash is almost always the culprit.
+
+
 ```engine.play(String name)```
 
 Plays a loaded sound at maximum volume (1.0f). Spawns a background thread automatically.
