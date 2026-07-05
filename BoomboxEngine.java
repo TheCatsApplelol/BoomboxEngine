@@ -1,6 +1,9 @@
 import javax.sound.sampled.*;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -18,31 +21,51 @@ public class BoomboxEngine {
     // background worker threads
     private final ExecutorService audioThreadPool = Executors.newCachedThreadPool();
 
-    // load sounds into memory
+    // load sounds into memory from a file on disk
     public void load(String name, String filepath) {
         try {
             File audioFile = new File(filepath);
             AudioInputStream ais = AudioSystem.getAudioInputStream(audioFile);
-            AudioFormat format = ais.getFormat();
-
-            // read the entire file into memory as a byte array
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = ais.read(buffer)) != -1) {
-                baos.write(buffer, 0, read);
-            }
-            byte[] audioData = baos.toByteArray();
-            ais.close();
-
-            // store it in our cache
-            soundCache.put(name, new CachedSound(format, audioData));
-            System.out.println("[Boombox] Loaded into RAM: " + name);
-
+            cache(name, ais);
         } catch (Exception e) {
             System.err.println("[Boombox] Failed to load sound: " + filepath);
             e.printStackTrace();
         }
+    }
+
+    // load sounds into memory from the classpath (e.g. bundled inside a jar)
+    public void loadResource(String name, String resourcePath) {
+        try (InputStream raw = BoomboxEngine.class.getResourceAsStream(resourcePath)) {
+            if (raw == null) {
+                System.err.println("[Boombox] Resource not found: " + resourcePath);
+                return;
+            }
+            // AudioSystem needs a stream that supports mark/reset to sniff the header
+            AudioInputStream ais = AudioSystem.getAudioInputStream(new BufferedInputStream(raw));
+            cache(name, ais);
+        } catch (Exception e) {
+            System.err.println("[Boombox] Failed to load resource: " + resourcePath);
+            e.printStackTrace();
+        }
+    }
+
+    // shared helper: drain an AudioInputStream into ram and stash it in the cache
+    private void cache(String name, AudioInputStream ais) throws IOException {
+        AudioFormat format = ais.getFormat();
+
+        // read the entire stream into memory as a byte array
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        int read;
+        while ((read = ais.read(buffer)) != -1) {
+            baos.write(buffer, 0, read);
+        }
+        byte[] audioData = baos.toByteArray();
+        ais.close();
+
+        // store it in our cache
+        soundCache.put(name, new CachedSound(format, audioData));
+        System.out.println("[Boombox] Loaded into RAM: " + name);
     }
 
     // play the sound
